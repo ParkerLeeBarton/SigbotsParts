@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sigbots Parts — ACM Purdue</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --gold: #CFB991;
+    --gold-bright: #DAAA00;
+    --black: #1a1a1a;
+    --dark: #0f0f0f;
+    --panel: #242424;
+    --panel2: #2e2e2e;
+    --border: #3a3a3a;
+    --text: #e8e8e8;
+    --muted: #888;
+    --green: #4caf72;
+    --red: #e05252;
+    --orange: #e0904a;
+    --blue: #4a90e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--dark); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100vh; }
+
+  /* NAV */
+  nav {
+    background: var(--black);
+    border-bottom: 2px solid var(--gold);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .nav-logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 22px;
+    color: var(--gold);
+    letter-spacing: 1px;
+  }
+  .nav-logo span { color: var(--text); font-weight: 400; }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab {
+    background: none; border: none; color: var(--muted);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 15px; font-weight: 600; letter-spacing: 1px;
+    padding: 8px 16px; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: all .2s; text-transform: uppercase;
+  }
+  .nav-tab:hover { color: var(--gold); }
+  .nav-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .cart-btn {
+    background: var(--gold); color: var(--black);
+    border: none; padding: 8px 16px; border-radius: 4px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 14px; letter-spacing: 1px;
+    cursor: pointer; transition: background .2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .cart-btn:hover { background: var(--gold-bright); }
+  .cart-count {
+    background: var(--black); color: var(--gold);
+    border-radius: 50%; width: 20px; height: 20px;
+    font-size: 11px; display: flex; align-items: center; justify-content: center;
+    font-weight: 900;
+  }
+  .admin-link {
+    color: var(--muted); font-size: 12px; cursor: pointer;
+    background: none; border: none; text-decoration: underline;
+  }
+  .admin-link:hover { color: var(--gold); }
+
+  /* PAGE */
+  .page { display: none; padding: 28px 24px; max-width: 1100px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* PARTS PAGE */
+  .parts-toolbar {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+  }
+  .search-input {
+    flex: 1; min-width: 200px;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 16px; border-radius: 6px;
+    font-family: 'Barlow', sans-serif; font-size: 14px;
+    outline: none; transition: border .2s;
+  }
+  .search-input:focus { border-color: var(--gold); }
+  .btn {
+    background: var(--gold); color: var(--black);
+    border: none; padding: 10px 20px; border-radius: 6px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 15px; letter-spacing: 1px;
+    cursor: pointer; transition: background .2s; white-space: nowrap;
+  }
+  .btn:hover { background: var(--gold-bright); }
+  .btn.secondary {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+  }
+  .btn.secondary:hover { background: var(--border); }
+  .btn.danger { background: var(--red); color: #fff; }
+  .btn.danger:hover { background: #c04040; }
+
+  .parts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .part-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; transition: border-color .2s, transform .15s;
+    display: flex; flex-direction: column;
+  }
+  .part-card:hover { border-color: var(--gold); transform: translateY(-2px); }
+  .part-img {
+    width: 100%; height: 140px; object-fit: cover; background: var(--panel2);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--border); font-size: 40px; flex-shrink: 0;
+  }
+  .part-img img { width: 100%; height: 100%; object-fit: cover; }
+  .part-body { padding: 14px; flex: 1; display: flex; flex-direction: column; }
+  .part-name { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 17px; margin-bottom: 4px; }
+  .part-price { color: var(--gold); font-weight: 600; font-size: 15px; margin-bottom: 10px; }
+  .part-link { color: var(--muted); font-size: 12px; text-decoration: none; word-break: break-all; }
+  .part-link:hover { color: var(--gold); }
+  .part-footer { padding: 12px 14px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+  .qty-input {
+    width: 54px; background: var(--panel2); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 8px; border-radius: 4px;
+    font-size: 14px; text-align: center;
+  }
+  .add-btn {
+    flex: 1; background: var(--gold); color: var(--black);
+    border: none; padding: 7px; border-radius: 4px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; letter-spacing: 1px; font-size: 14px;
+    cursor: pointer; transition: background .2s;
+  }
+  .add-btn:hover { background: var(--gold-bright); }
+  .empty-state {
+    text-align: center; padding: 60px 20px; color: var(--muted);
+  }
+  .empty-state .big { font-size: 48px; margin-bottom: 12px; }
+
+  /* CART SIDEBAR */
+  .cart-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.6); z-index: 200;
+  }
+  .cart-overlay.open { display: block; }
+  .cart-drawer {
+    position: fixed; right: 0; top: 0; bottom: 0; width: 380px;
+    background: var(--panel); border-left: 2px solid var(--gold);
+    z-index: 201; overflow-y: auto; display: flex; flex-direction: column;
+  }
+  .cart-header {
+    padding: 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .cart-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; }
+  .close-btn { background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; }
+  .close-btn:hover { color: var(--text); }
+  .cart-items { flex: 1; padding: 16px; overflow-y: auto; }
+  .cart-item {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px; margin-bottom: 10px;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .cart-item-info { flex: 1; }
+  .cart-item-name { font-weight: 600; font-size: 14px; }
+  .cart-item-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .cart-item-remove { background: none; border: none; color: var(--red); cursor: pointer; font-size: 16px; }
+  .cart-footer { padding: 16px; border-top: 1px solid var(--border); }
+  .cart-name-input {
+    width: 100%; background: var(--panel2); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 14px; border-radius: 6px;
+    font-family: 'Barlow', sans-serif; font-size: 14px; margin-bottom: 10px;
+    outline: none;
+  }
+  .cart-name-input:focus { border-color: var(--gold); }
+  .cart-notes-input {
+    width: 100%; background: var(--panel2); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 14px; border-radius: 6px;
+    font-family: 'Barlow', sans-serif; font-size: 13px; margin-bottom: 10px;
+    outline: none; resize: vertical; min-height: 70px;
+  }
+  .cart-notes-input:focus { border-color: var(--gold); }
+  .cart-total { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; margin-bottom: 12px; }
+  .cart-total span { color: var(--gold); }
+
+  /* ORDERS PAGE */
+  .orders-header { margin-bottom: 20px; }
+  .orders-header h2 { font-family: 'Barlow Condensed', sans-serif; font-size: 28px; font-weight: 700; }
+  .order-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 14px; overflow: hidden;
+  }
+  .order-card-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .order-name { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; }
+  .order-date { color: var(--muted); font-size: 13px; margin-left: auto; }
+  .badge {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 12px; letter-spacing: 1px;
+    padding: 3px 10px; border-radius: 20px; text-transform: uppercase;
+  }
+  .badge-pending { background: #3a3020; color: var(--gold); }
+  .badge-approved { background: #1a3020; color: var(--green); }
+  .badge-denied { background: #3a1a1a; color: var(--red); }
+  .badge-modified { background: #1a2540; color: var(--blue); }
+  .badge-ordered { background: #2a2040; color: #a070e0; }
+  .badge-shipped { background: #1a3030; color: #50c0c0; }
+  .order-items { padding: 14px 20px; }
+  .order-item-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .order-item-row:last-child { border-bottom: none; }
+  .order-notes { padding: 8px 20px 14px; color: var(--muted); font-size: 13px; font-style: italic; }
+  .order-admin-note { padding: 8px 20px; color: var(--blue); font-size: 13px; }
+  .order-total { padding: 10px 20px; background: var(--panel2); font-weight: 600; text-align: right; }
+  .order-total span { color: var(--gold); }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.75); z-index: 300;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--gold);
+    border-radius: 10px; padding: 28px; width: 480px; max-width: 95vw;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal h3 { font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 20px; }
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 13px; color: var(--muted); margin-bottom: 5px; display: block; text-transform: uppercase; letter-spacing: .5px; }
+  .form-input {
+    width: 100%; background: var(--panel2); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 14px; border-radius: 6px;
+    font-family: 'Barlow', sans-serif; font-size: 14px; outline: none;
+  }
+  .form-input:focus { border-color: var(--gold); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+  /* ADMIN */
+  .admin-order-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 16px; overflow: hidden;
+  }
+  .admin-order-actions { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .admin-select {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 12px; border-radius: 4px; font-size: 13px; cursor: pointer;
+  }
+  .admin-tabs { display: flex; gap: 4px; margin-bottom: 24px; flex-wrap: wrap; }
+  .admin-tab {
+    background: var(--panel2); border: 1px solid var(--border);
+    color: var(--muted); padding: 8px 16px; border-radius: 4px;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 14px;
+    cursor: pointer; transition: all .2s; font-weight: 600; letter-spacing: 1px;
+  }
+  .admin-tab:hover { border-color: var(--gold); color: var(--gold); }
+  .admin-tab.active { background: var(--gold); color: var(--black); border-color: var(--gold); }
+  .parts-list { }
+  .parts-list-item {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 16px; margin-bottom: 8px;
+    display: flex; gap: 12px; align-items: center;
+  }
+  .parts-list-item-info { flex: 1; }
+  .parts-list-item-name { font-weight: 600; font-size: 15px; }
+  .parts-list-item-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .tag { display: inline-block; background: var(--panel2); border: 1px solid var(--border); border-radius: 3px; padding: 2px 7px; font-size: 11px; color: var(--muted); }
+
+  /* SUCCESS */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--green); color: #fff;
+    padding: 12px 24px; border-radius: 6px;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px;
+    z-index: 500; transition: transform .3s;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .pay-opt {
+    flex: 1; background: var(--panel2); border: 2px solid var(--border);
+    color: var(--text); padding: 10px 8px; border-radius: 6px;
+    cursor: pointer; transition: all .2s; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  .pay-opt:hover { border-color: var(--gold); }
+  .pay-opt.active { border-color: var(--gold); background: rgba(207,185,145,.12); }
+
+  @media (max-width: 600px) {
+    .cart-drawer { width: 100%; }
+    .parts-grid { grid-template-columns: 1fr 1fr; }
+    nav { padding: 0 12px; }
+    .nav-logo { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">SIGBOTS <span>PARTS</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('parts')">Catalog</button>
+    <button class="nav-tab" onclick="showPage('orders')">My Orders</button>
+    <button class="nav-tab" id="admin-nav-tab" style="display:none" onclick="showPage('admin')">Admin</button>
+  </div>
+  <div class="nav-right">
+    <button class="cart-btn" onclick="openCart()">
+      🛒 Cart <span class="cart-count" id="cart-count">0</span>
+    </button>
+    <button class="admin-link" onclick="showAdminLogin()">Admin</button>
+  </div>
+</nav>
+
+<!-- PARTS PAGE -->
+<div class="page active" id="page-parts">
+  <div class="parts-toolbar">
+    <input class="search-input" type="text" placeholder="Search parts..." id="search-input" oninput="renderParts()"/>
+    <button class="btn" onclick="openAddPartModal()">+ Add Part</button>
+  </div>
+  <div class="parts-grid" id="parts-grid"></div>
+</div>
+
+<!-- ORDERS PAGE -->
+<div class="page" id="page-orders">
+  <div class="orders-header">
+    <h2>Order History</h2>
+    <p style="color:var(--muted);font-size:13px;margin-top:4px;">All submitted part requests</p>
+  </div>
+  <div id="orders-list"></div>
+</div>
+
+<!-- ADMIN PAGE -->
+<div class="page" id="page-admin">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <h2 style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;">Admin Panel</h2>
+    <button class="btn secondary" onclick="adminLogout()">Logout</button>
+  </div>
+  <div class="admin-tabs">
+    <button class="admin-tab active" onclick="showAdminTab('orders')">Orders</button>
+    <button class="admin-tab" onclick="showAdminTab('parts')">Manage Parts</button>
+  </div>
+  <div id="admin-orders-tab"></div>
+  <div id="admin-parts-tab" style="display:none;"></div>
+</div>
+
+<!-- CART OVERLAY -->
+<div class="cart-overlay" id="cart-overlay" onclick="closeCart()"></div>
+<div class="cart-drawer" id="cart-drawer">
+  <div class="cart-header">
+    <span class="cart-title">🛒 Cart</span>
+    <button class="close-btn" onclick="closeCart()">✕</button>
+  </div>
+  <div class="cart-items" id="cart-items-list"></div>
+  <div class="cart-footer">
+    <input class="cart-name-input" id="requester-name" placeholder="Your name (required)" />
+    <textarea class="cart-notes-input" id="order-notes" placeholder="Notes / justification (optional)"></textarea>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Payment Type *</div>
+      <div style="display:flex;gap:8px;">
+        <button class="pay-opt active" id="pay-lead" onclick="selectPay('lead')">
+          <span style="font-size:16px;">💳</span>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;">Lead Pays</div>
+          <div style="font-size:11px;opacity:.8;">Mechanics lead covers it</div>
+        </button>
+        <button class="pay-opt" id="pay-self" onclick="selectPay('self')">
+          <span style="font-size:16px;">🧾</span>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;">Self Pay</div>
+          <div style="font-size:11px;opacity:.8;">I pay, request reimbursement</div>
+        </button>
+      </div>
+    </div>
+    <div class="cart-total">Total: <span id="cart-total">$0.00</span></div>
+    <button class="btn" style="width:100%" onclick="submitOrder()">Submit Request</button>
+  </div>
+</div>
+
+<!-- ADD PART MODAL -->
+<div class="modal-overlay" id="add-part-modal">
+  <div class="modal">
+    <h3>Add New Part</h3>
+    <div class="form-group">
+      <label class="form-label">Part Name *</label>
+      <input class="form-input" id="new-part-name" placeholder="e.g. 1x2x35 C-Channel"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Price Per Unit ($) *</label>
+      <input class="form-input" type="number" id="new-part-price" step="0.01" min="0" placeholder="0.00"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Product URL</label>
+      <input class="form-input" id="new-part-url" placeholder="https://vexrobotics.com/..."/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Image URL (optional)</label>
+      <input class="form-input" id="new-part-img" placeholder="https://...image.jpg"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Category / Tag</label>
+      <input class="form-input" id="new-part-tag" placeholder="e.g. Structure, Motion, Electronics"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeAddPartModal()">Cancel</button>
+      <button class="btn" onclick="addPart()">Add Part</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN LOGIN MODAL -->
+<div class="modal-overlay" id="admin-login-modal">
+  <div class="modal">
+    <h3>🔐 Admin Login</h3>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="form-input" type="password" id="admin-password" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')adminLogin()"/>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px;">Default: <b>sigbots2025</b> — change via Settings after login</p>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('admin-login-modal')">Cancel</button>
+      <button class="btn" onclick="adminLogin()">Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODIFY ORDER MODAL -->
+<div class="modal-overlay" id="modify-modal">
+  <div class="modal">
+    <h3>✏️ Modify & Approve Order</h3>
+    <div id="modify-modal-items"></div>
+    <div class="form-group" style="margin-top:16px;">
+      <label class="form-label">Admin Note (shown to requester)</label>
+      <textarea class="form-input" id="modify-admin-note" style="min-height:80px;resize:vertical;" placeholder="e.g. Approved with quantity changes due to budget"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('modify-modal')">Cancel</button>
+      <button class="btn" onclick="saveModify()">Save & Approve</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHANGE PASSWORD MODAL -->
+<div class="modal-overlay" id="change-pw-modal">
+  <div class="modal">
+    <h3>🔑 Change Admin Password</h3>
+    <div class="form-group">
+      <label class="form-label">New Password</label>
+      <input class="form-input" type="password" id="new-pw-input" placeholder="New password"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal('change-pw-modal')">Cancel</button>
+      <button class="btn" onclick="changePassword()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let parts = [];
+let orders = [];
+let cart = []; // {partId, qty}
+let adminLoggedIn = false;
+let adminPassword = 'sigbots2025';
+let currentAdminTab = 'orders';
+let modifyingOrderId = null;
+let payType = 'lead'; // 'lead' or 'self'
+
+function selectPay(type) {
+  payType = type;
+  document.getElementById('pay-lead').classList.toggle('active', type === 'lead');
+  document.getElementById('pay-self').classList.toggle('active', type === 'self');
+}
+
+// ─── STORAGE ─────────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const [pr, or, pw] = await Promise.all([
+      window.storage.get('parts', true).catch(()=>null),
+      window.storage.get('orders', true).catch(()=>null),
+      window.storage.get('adminpw', true).catch(()=>null)
+    ]);
+    if (pr) parts = JSON.parse(pr.value);
+    if (or) orders = JSON.parse(or.value);
+    if (pw) adminPassword = pw.value;
+  } catch(e) { console.error(e); }
+  renderParts();
+  renderOrders();
+}
+
+async function saveParts() {
+  await window.storage.set('parts', JSON.stringify(parts), true).catch(()=>{});
+}
+async function saveOrders() {
+  await window.storage.set('orders', JSON.stringify(orders), true).catch(()=>{});
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'orders') renderOrders();
+  if (name === 'admin') renderAdmin();
+}
+
+// ─── PARTS ───────────────────────────────────────────────────────────────────
+function renderParts() {
+  const q = (document.getElementById('search-input').value || '').toLowerCase();
+  const grid = document.getElementById('parts-grid');
+  const filtered = parts.filter(p =>
+    p.name.toLowerCase().includes(q) ||
+    (p.tag || '').toLowerCase().includes(q)
+  );
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="big">📦</div><p>${parts.length ? 'No parts match your search.' : 'No parts yet. Click <b>+ Add Part</b> to add the first one!'}</p></div>`;
+    return;
+  }
+  grid.innerHTML = filtered.map(p => `
+    <div class="part-card">
+      <div class="part-img">
+        ${p.img ? `<img src="${p.img}" alt="${p.name}" onerror="this.parentElement.innerHTML='📦'"/>` : '📦'}
+      </div>
+      <div class="part-body">
+        <div class="part-name">${p.name}</div>
+        <div class="part-price">$${Number(p.price).toFixed(2)} / unit</div>
+        ${p.tag ? `<span class="tag">${p.tag}</span>` : ''}
+        ${p.url ? `<a class="part-link" href="${p.url}" target="_blank">↗ View Product</a>` : ''}
+      </div>
+      <div class="part-footer">
+        <input class="qty-input" type="number" min="1" value="1" id="qty-${p.id}"/>
+        <button class="add-btn" onclick="addToCart('${p.id}')">Add to Cart</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openAddPartModal() {
+  document.getElementById('add-part-modal').classList.add('open');
+}
+function closeAddPartModal() {
+  closeModal('add-part-modal');
+  ['new-part-name','new-part-price','new-part-url','new-part-img','new-part-tag'].forEach(id => document.getElementById(id).value = '');
+}
+async function addPart() {
+  const name = document.getElementById('new-part-name').value.trim();
+  const price = parseFloat(document.getElementById('new-part-price').value);
+  const url = document.getElementById('new-part-url').value.trim();
+  const img = document.getElementById('new-part-img').value.trim();
+  const tag = document.getElementById('new-part-tag').value.trim();
+  if (!name || isNaN(price)) { alert('Name and price are required.'); return; }
+  const part = { id: Date.now().toString(), name, price, url, img, tag, created: new Date().toISOString() };
+  parts.push(part);
+  await saveParts();
+  closeAddPartModal();
+  renderParts();
+  showToast('Part added!');
+}
+
+// ─── CART ────────────────────────────────────────────────────────────────────
+function addToCart(partId) {
+  const qty = parseInt(document.getElementById('qty-' + partId).value) || 1;
+  const existing = cart.find(c => c.partId === partId);
+  if (existing) existing.qty += qty;
+  else cart.push({ partId, qty });
+  updateCartCount();
+  showToast('Added to cart!');
+}
+function updateCartCount() {
+  document.getElementById('cart-count').textContent = cart.reduce((s,c) => s + c.qty, 0);
+}
+function openCart() {
+  renderCartItems();
+  document.getElementById('cart-overlay').classList.add('open');
+  document.getElementById('cart-drawer').style.right = '0';
+}
+function closeCart() {
+  document.getElementById('cart-overlay').classList.remove('open');
+}
+function renderCartItems() {
+  const list = document.getElementById('cart-items-list');
+  if (!cart.length) {
+    list.innerHTML = '<div class="empty-state"><p>Cart is empty.</p></div>';
+    document.getElementById('cart-total').textContent = '$0.00';
+    return;
+  }
+  let total = 0;
+  list.innerHTML = cart.map((item, idx) => {
+    const part = parts.find(p => p.id === item.partId);
+    if (!part) return '';
+    const sub = part.price * item.qty;
+    total += sub;
+    return `<div class="cart-item">
+      <div class="cart-item-info">
+        <div class="cart-item-name">${part.name}</div>
+        <div class="cart-item-meta">Qty: ${item.qty} × $${part.price.toFixed(2)} = $${sub.toFixed(2)}</div>
+      </div>
+      <button class="cart-item-remove" onclick="removeFromCart(${idx})">✕</button>
+    </div>`;
+  }).join('');
+  document.getElementById('cart-total').textContent = '$' + total.toFixed(2);
+}
+function removeFromCart(idx) {
+  cart.splice(idx, 1);
+  updateCartCount();
+  renderCartItems();
+}
+async function submitOrder() {
+  const name = document.getElementById('requester-name').value.trim();
+  if (!name) { alert('Please enter your name.'); return; }
+  if (!cart.length) { alert('Cart is empty.'); return; }
+  const notes = document.getElementById('order-notes').value.trim();
+  const items = cart.map(c => {
+    const part = parts.find(p => p.id === c.partId);
+    return { partId: c.partId, partName: part?.name, price: part?.price, qty: c.qty };
+  });
+  const order = {
+    id: Date.now().toString(),
+    name,
+    notes,
+    payType, // 'lead' or 'self'
+    items,
+    status: 'pending',
+    shippingStatus: '',
+    adminNote: '',
+    created: new Date().toISOString()
+  };
+  orders.unshift(order);
+  await saveOrders();
+  cart = [];
+  document.getElementById('requester-name').value = '';
+  document.getElementById('order-notes').value = '';
+  updateCartCount();
+  closeCart();
+  showToast('Order submitted!');
+}
+
+// ─── ORDERS ──────────────────────────────────────────────────────────────────
+function statusBadgeClass(s) {
+  if (s === 'approved' || s === 'modified-approved') return 'badge-approved';
+  if (s === 'denied') return 'badge-denied';
+  if (s === 'pending') return 'badge-pending';
+  return 'badge-modified';
+}
+function statusLabel(s) {
+  if (s === 'modified-approved') return 'Modified & Approved';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function renderOrders() {
+  const list = document.getElementById('orders-list');
+  if (!list) return;
+  if (!orders.length) {
+    list.innerHTML = '<div class="empty-state"><div class="big">📋</div><p>No orders yet.</p></div>';
+    return;
+  }
+  list.innerHTML = orders.map(o => orderCardHTML(o, false)).join('');
+}
+function orderCardHTML(o, isAdmin) {
+  const total = o.items.reduce((s, i) => s + (i.price * i.qty), 0);
+  const shippingBadge = o.shippingStatus ? `<span class="badge ${o.shippingStatus === 'shipped' ? 'badge-shipped' : 'badge-ordered'}">${o.shippingStatus}</span>` : '';
+  const payBadge = o.payType === 'self'
+    ? `<span class="badge" style="background:#2a1a40;color:#c090f0;">🧾 Self Pay</span>`
+    : `<span class="badge" style="background:#1a2a1a;color:#80c080;">💳 Lead Pays</span>`;
+  return `<div class="order-card ${isAdmin ? 'admin-order-card' : ''}">
+    <div class="order-card-header">
+      <span class="order-name">${o.name}</span>
+      <span class="badge ${statusBadgeClass(o.status)}">${statusLabel(o.status)}</span>
+      ${payBadge}
+      ${shippingBadge}
+      <span class="order-date">${new Date(o.created).toLocaleDateString()}</span>
+    </div>
+    <div class="order-items">
+      ${o.items.map(i => `<div class="order-item-row"><span>${i.partName}</span><span>×${i.qty} = $${(i.price * i.qty).toFixed(2)}</span></div>`).join('')}
+    </div>
+    ${o.notes ? `<div class="order-notes">📝 ${o.notes}</div>` : ''}
+    ${o.adminNote ? `<div class="order-admin-note">💬 Admin: ${o.adminNote}</div>` : ''}
+    <div class="order-total">Total: <span>$${total.toFixed(2)}</span></div>
+    ${isAdmin ? adminActionsHTML(o) : ''}
+  </div>`;
+}
+function adminActionsHTML(o) {
+  return `<div class="admin-order-actions">
+    ${o.status === 'pending' || o.status === 'denied' ? `<button class="btn" style="font-size:13px;padding:7px 14px" onclick="quickApprove('${o.id}')">✅ Approve</button>` : ''}
+    ${o.status !== 'denied' ? `<button class="btn danger" style="font-size:13px;padding:7px 14px" onclick="denyOrder('${o.id}')">✗ Deny</button>` : ''}
+    <button class="btn secondary" style="font-size:13px;padding:7px 14px" onclick="openModify('${o.id}')">✏️ Modify</button>
+    <select class="admin-select" onchange="updateShipping('${o.id}', this.value)">
+      <option value="">Shipping…</option>
+      <option value="ordered" ${o.shippingStatus === 'ordered' ? 'selected' : ''}>Ordered</option>
+      <option value="shipped" ${o.shippingStatus === 'shipped' ? 'selected' : ''}>Shipped</option>
+    </select>
+    <button class="btn danger" style="font-size:13px;padding:7px 14px;margin-left:auto" onclick="deleteOrder('${o.id}')">🗑</button>
+  </div>`;
+}
+
+// ─── ADMIN ───────────────────────────────────────────────────────────────────
+function renderAdmin() {
+  if (currentAdminTab === 'orders') renderAdminOrders();
+  else renderAdminParts();
+}
+function showAdminTab(tab) {
+  currentAdminTab = tab;
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('admin-orders-tab').style.display = tab === 'orders' ? '' : 'none';
+  document.getElementById('admin-parts-tab').style.display = tab === 'parts' ? '' : 'none';
+  renderAdmin();
+}
+function renderAdminOrders() {
+  const el = document.getElementById('admin-orders-tab');
+  if (!orders.length) { el.innerHTML = '<div class="empty-state"><p>No orders yet.</p></div>'; return; }
+  el.innerHTML = orders.map(o => orderCardHTML(o, true)).join('');
+}
+function renderAdminParts() {
+  const el = document.getElementById('admin-parts-tab');
+  if (!parts.length) { el.innerHTML = '<div class="empty-state"><p>No parts yet.</p></div>'; return; }
+  el.innerHTML = `
+    <div style="margin-bottom:12px;display:flex;justify-content:flex-end;gap:10px;">
+      <button class="btn secondary" onclick="openAddPartModal()">+ Add Part</button>
+      <button class="btn secondary" onclick="openModal('change-pw-modal')">🔑 Change Password</button>
+    </div>
+    <div class="parts-list">
+      ${parts.map(p => `<div class="parts-list-item">
+        ${p.img ? `<img src="${p.img}" style="width:50px;height:50px;object-fit:cover;border-radius:4px;" onerror="this.style.display='none'"/>` : '<div style="width:50px;height:50px;background:var(--panel2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px">📦</div>'}
+        <div class="parts-list-item-info">
+          <div class="parts-list-item-name">${p.name}</div>
+          <div class="parts-list-item-meta">$${Number(p.price).toFixed(2)} / unit ${p.tag ? '· ' + p.tag : ''} ${p.url ? `· <a href="${p.url}" target="_blank" style="color:var(--gold)">Link</a>` : ''}</div>
+        </div>
+        <button class="btn danger" style="font-size:13px;padding:6px 12px" onclick="deletePart('${p.id}')">Delete</button>
+      </div>`).join('')}
+    </div>`;
+}
+
+async function quickApprove(id) {
+  const o = orders.find(o => o.id === id);
+  if (!o) return;
+  o.status = 'approved';
+  await saveOrders();
+  renderAdminOrders();
+  showToast('Order approved!');
+}
+async function denyOrder(id) {
+  const note = prompt('Reason for denial (optional):');
+  const o = orders.find(o => o.id === id);
+  if (!o) return;
+  o.status = 'denied';
+  if (note) o.adminNote = note;
+  await saveOrders();
+  renderAdminOrders();
+  showToast('Order denied.');
+}
+async function updateShipping(id, val) {
+  const o = orders.find(o => o.id === id);
+  if (!o) return;
+  o.shippingStatus = val;
+  await saveOrders();
+  renderAdminOrders();
+}
+async function deleteOrder(id) {
+  if (!confirm('Delete this order permanently?')) return;
+  orders = orders.filter(o => o.id !== id);
+  await saveOrders();
+  renderAdminOrders();
+}
+async function deletePart(id) {
+  if (!confirm('Delete this part? It will be removed from the catalog.')) return;
+  parts = parts.filter(p => p.id !== id);
+  await saveParts();
+  renderAdminParts();
+  renderParts();
+  showToast('Part deleted.');
+}
+
+// Modify modal
+function openModify(orderId) {
+  modifyingOrderId = orderId;
+  const o = orders.find(o => o.id === orderId);
+  if (!o) return;
+  const el = document.getElementById('modify-modal-items');
+  el.innerHTML = o.items.map((item, idx) => `
+    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:8px;">
+      <div style="font-weight:600;margin-bottom:8px;">${item.partName}</div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <label style="font-size:12px;color:var(--muted);">Qty:</label>
+        <input class="qty-input" type="number" min="0" value="${item.qty}" id="modify-qty-${idx}" style="width:70px"/>
+        <span style="font-size:13px;color:var(--muted);">× $${item.price.toFixed(2)}</span>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('modify-admin-note').value = o.adminNote || '';
+  openModal('modify-modal');
+}
+async function saveModify() {
+  const o = orders.find(o => o.id === modifyingOrderId);
+  if (!o) return;
+  o.items = o.items.map((item, idx) => {
+    const newQty = parseInt(document.getElementById('modify-qty-' + idx).value) || 0;
+    return { ...item, qty: newQty };
+  }).filter(i => i.qty > 0);
+  o.adminNote = document.getElementById('modify-admin-note').value.trim();
+  o.status = 'modified-approved';
+  await saveOrders();
+  closeModal('modify-modal');
+  renderAdminOrders();
+  showToast('Order modified & approved!');
+}
+
+// ─── ADMIN AUTH ───────────────────────────────────────────────────────────────
+function showAdminLogin() { openModal('admin-login-modal'); }
+function adminLogin() {
+  const pw = document.getElementById('admin-password').value;
+  if (pw === adminPassword) {
+    adminLoggedIn = true;
+    closeModal('admin-login-modal');
+    document.getElementById('admin-nav-tab').style.display = '';
+    document.getElementById('admin-nav-tab').click();
+    showToast('Welcome, Mechanics Lead!');
+  } else {
+    alert('Incorrect password.');
+  }
+  document.getElementById('admin-password').value = '';
+}
+function adminLogout() {
+  adminLoggedIn = false;
+  document.getElementById('admin-nav-tab').style.display = 'none';
+  document.querySelectorAll('.nav-tab')[0].click();
+}
+async function changePassword() {
+  const newPw = document.getElementById('new-pw-input').value.trim();
+  if (!newPw) { alert('Enter a new password.'); return; }
+  adminPassword = newPw;
+  await window.storage.set('adminpw', newPw, true).catch(()=>{});
+  closeModal('change-pw-modal');
+  showToast('Password updated!');
+}
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
