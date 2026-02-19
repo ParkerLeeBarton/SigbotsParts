@@ -135,6 +135,32 @@
   .img-upload-area.has-img { border-style: solid; border-color: var(--gold); padding: 8px; }
   .img-upload-area p { color: var(--muted); font-size: 13px; margin-top: 6px; }
 
+  /* Admin buy list */
+  .buy-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .buy-item:last-child { border-bottom: none; }
+  .buy-item-num {
+    background: var(--gold); color: var(--black);
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 900;
+    font-size: 12px; border-radius: 50%; width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;
+  }
+  .buy-item-info { flex: 1; min-width: 0; }
+  .buy-item-name { font-weight: 600; font-size: 15px; margin-bottom: 3px; }
+  .buy-item-link { color: var(--gold); font-size: 12px; text-decoration: none; word-break: break-all; display: block; margin-bottom: 4px; }
+  .buy-item-link:hover { color: var(--gold-bright); text-decoration: underline; }
+  .buy-item-link.no-link { color: var(--muted); font-style: italic; }
+  .buy-item-price { font-size: 13px; color: var(--muted); }
+  .buy-item-qty {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 12px; text-align: center; flex-shrink: 0;
+  }
+  .buy-item-qty .qty-num { font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 22px; color: var(--gold); line-height: 1; }
+  .buy-item-qty .qty-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .buy-item-sub { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; color: var(--text); flex-shrink: 0; align-self: center; min-width: 70px; text-align: right; }
+
   .admin-tabs { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
   .admin-tab { background: var(--panel2); border: 1px solid var(--border); color: var(--muted); padding: 8px 16px; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; cursor: pointer; transition: all .2s; font-weight: 600; letter-spacing: 1px; }
   .admin-tab:hover { border-color: var(--gold); color: var(--gold); }
@@ -294,7 +320,6 @@
       <label class="form-label">Password</label>
       <input class="form-control" type="password" id="admin-password" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')adminLogin()"/>
     </div>
-    <p style="font-size:12px;color:var(--muted);margin-top:6px">Default: <b style="color:var(--gold)">sigbots2025</b></p>
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('admin-login-modal')">Cancel</button>
       <button class="btn" onclick="adminLogin()">Login</button>
@@ -344,7 +369,7 @@ let parts   = [];
 let orders  = [];
 let cart    = [];
 let adminLoggedIn = false;
-let adminPassword = 'sigbots2025';
+let adminPassword = null; // never set in code — loaded from Firestore only
 let payType = 'lead';
 let modifyingOrderId = null;
 let pendingImgData   = null;
@@ -362,9 +387,16 @@ onSnapshot(query(collection(db,'orders'), orderBy('created','desc')), snap => {
   if (adminLoggedIn) renderAdminOrders();
 });
 
-// Load admin password from Firestore (stored in a settings doc)
+// Load admin password from Firestore only — never stored in JS source
 getDoc(doc(db,'settings','admin')).then(d => {
-  if (d.exists() && d.data().password) adminPassword = d.data().password;
+  if (d.exists() && d.data().password) {
+    adminPassword = d.data().password;
+  } else {
+    // First time setup: write the default password to Firestore, then clear it from memory
+    setDoc(doc(db,'settings','admin'), { password: 'sigbots2025' }).then(() => {
+      adminPassword = 'sigbots2025';
+    });
+  }
 });
 
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
@@ -548,6 +580,30 @@ function orderHTML(o, isAdmin) {
   const payBadge = o.payType==='self'
     ? `<span class="badge badge-selfpay">🧾 Self Pay</span>`
     : `<span class="badge badge-leadpay">💳 Lead Pays</span>`;
+
+  // Admin gets a full buy-list with links; users get a simple summary
+  const itemsHTML = isAdmin
+    ? o.items.map((i,idx) => {
+        const part = parts.find(p=>p.id===i.partId);
+        const url  = part?.url || i.url || '';
+        return `<div class="buy-item">
+          <div class="buy-item-num">${idx+1}</div>
+          <div class="buy-item-info">
+            <div class="buy-item-name">${h(i.partName)}</div>
+            ${url
+              ? `<a class="buy-item-link" href="${h(url)}" target="_blank" rel="noopener">🔗 ${h(url)}</a>`
+              : `<span class="buy-item-link no-link">No link on file</span>`}
+            <div class="buy-item-price">$${i.price.toFixed(2)} / unit</div>
+          </div>
+          <div class="buy-item-qty">
+            <div class="qty-num">${i.qty}</div>
+            <div class="qty-label">qty</div>
+          </div>
+          <div class="buy-item-sub">$${(i.price*i.qty).toFixed(2)}</div>
+        </div>`;
+      }).join('')
+    : o.items.map(i=>`<div class="order-item-row"><span>${h(i.partName)}</span><span>×${i.qty} = $${(i.price*i.qty).toFixed(2)}</span></div>`).join('');
+
   return `<div class="order-card">
     <div class="order-card-header">
       <span class="order-name">${h(o.name)}</span>
@@ -555,8 +611,8 @@ function orderHTML(o, isAdmin) {
       ${payBadge}${shipBadge}
       <span class="order-date">${new Date(o.created).toLocaleDateString()}</span>
     </div>
-    <div class="order-items">
-      ${o.items.map(i=>`<div class="order-item-row"><span>${h(i.partName)}</span><span>×${i.qty} = $${(i.price*i.qty).toFixed(2)}</span></div>`).join('')}
+    <div class="${isAdmin ? 'order-items' : 'order-items'}">
+      ${itemsHTML}
     </div>
     ${o.notes     ? `<div class="order-notes">📝 ${h(o.notes)}</div>` : ''}
     ${o.adminNote ? `<div class="order-admin-note">💬 Admin: ${h(o.adminNote)}</div>` : ''}
@@ -666,10 +722,16 @@ window.saveModify = async function() {
 };
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
-window.adminLogin = function() {
+window.adminLogin = async function() {
   const pw = document.getElementById('admin-password').value;
+  if (!adminPassword) {
+    // Try fetching fresh from Firestore in case it wasn't loaded yet
+    const d = await getDoc(doc(db,'settings','admin'));
+    if (d.exists()) adminPassword = d.data().password;
+  }
   if (pw === adminPassword) {
     adminLoggedIn = true;
+    adminPassword = null; // wipe from memory after successful login
     closeModal('admin-login-modal');
     document.getElementById('admin-password').value='';
     document.getElementById('tab-admin').style.display='';
@@ -688,8 +750,8 @@ window.adminLogout = function() {
 window.changePassword = async function() {
   const newPw = document.getElementById('new-pw-input').value.trim();
   if (!newPw) { alert('Please enter a new password.'); return; }
-  adminPassword = newPw;
   await setDoc(doc(db,'settings','admin'), { password: newPw });
+  adminPassword = null; // wipe from memory immediately
   document.getElementById('new-pw-input').value='';
   showToast('🔑 Password updated!');
 };
