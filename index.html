@@ -236,12 +236,12 @@
   <div id="admin-orders-tab"></div>
   <div id="admin-parts-tab" style="display:none"></div>
   <div id="admin-settings-tab" style="display:none">
-    <div style="max-width:360px">
-      <div class="form-group">
-        <label class="form-label">New Admin Password</label>
-        <input class="form-control" type="password" id="new-pw-input" placeholder="Enter new password"/>
-      </div>
-      <button class="btn" onclick="changePassword()">Save Password</button>
+    <div style="max-width:420px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;margin-bottom:10px">🔑 Password Management</div>
+      <p style="color:var(--muted);font-size:14px;line-height:1.6">Your password is managed securely through <b style="color:var(--text)">Firebase Authentication</b> — not stored in this app at all.</p>
+      <p style="color:var(--muted);font-size:14px;line-height:1.6;margin-top:10px">To change your password, go to:<br>
+        <b style="color:var(--gold)">Firebase Console → Authentication → Users → your email → Reset password</b>
+      </p>
     </div>
   </div>
 </div>
@@ -317,12 +317,17 @@
   <div class="modal">
     <h3>🔐 Admin Login</h3>
     <div class="form-group">
-      <label class="form-label">Password</label>
-      <input class="form-control" type="password" id="admin-password" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')adminLogin()"/>
+      <label class="form-label">Email</label>
+      <input class="form-control" type="email" id="admin-email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')adminLogin()"/>
     </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="form-control" type="password" id="admin-password" placeholder="Password" onkeydown="if(event.key==='Enter')adminLogin()"/>
+    </div>
+    <p id="login-error" style="color:var(--red);font-size:13px;min-height:18px"></p>
     <div class="modal-actions">
       <button class="btn secondary" onclick="closeModal('admin-login-modal')">Cancel</button>
-      <button class="btn" onclick="adminLogin()">Login</button>
+      <button class="btn" id="login-btn" onclick="adminLogin()">Login</button>
     </div>
   </div>
 </div>
@@ -347,56 +352,62 @@
 
 <!-- Firebase SDK -->
 <script type="module">
-import { initializeApp }                              from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc,
-         addDoc, setDoc, updateDoc, deleteDoc,
-         onSnapshot, orderBy, query, getDoc }         from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeApp }                                      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, addDoc, setDoc,
+         updateDoc, deleteDoc, onSnapshot, orderBy, query }   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, signOut,
+         onAuthStateChanged }                                  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-// ─── FIREBASE CONFIG ─────────────────────────────────────────────────────────
-const firebaseConfig = {
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const app = initializeApp({
   apiKey:            "AIzaSyAzS-srHQ3c8PDqAiPxlswoGro5AlaCIMA",
   authDomain:        "sigbots-parts.firebaseapp.com",
   projectId:         "sigbots-parts",
   storageBucket:     "sigbots-parts.firebasestorage.app",
   messagingSenderId: "899907444846",
   appId:             "1:899907444846:web:d558db7f81178f93fdc67f"
-};
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+});
+const db   = getFirestore(app);
+const auth = getAuth(app);
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
-let parts   = [];
-let orders  = [];
-let cart    = [];
-let adminLoggedIn = false;
-let adminPassword = null; // never set in code — loaded from Firestore only
-let payType = 'lead';
+let parts  = [], orders = [], cart = [];
+let currentUser    = null;
+let payType        = 'lead';
 let modifyingOrderId = null;
 let pendingImgData   = null;
 
-// ─── REAL-TIME LISTENERS ─────────────────────────────────────────────────────
+// ─── AUTH STATE ──────────────────────────────────────────────────────────────
+// This is the single source of truth — Firebase tells us if logged in or not.
+// No password is ever stored or checked in JS.
+onAuthStateChanged(auth, user => {
+  currentUser = user;
+  if (user) {
+    // Logged in — show admin tab, go there
+    document.getElementById('tab-admin').style.display = '';
+    closeModal('admin-login-modal');
+    document.getElementById('admin-email').value    = '';
+    document.getElementById('admin-password').value = '';
+    showPage('admin', document.getElementById('tab-admin'));
+    showToast('👋 Welcome, Mechanics Lead!');
+  } else {
+    // Logged out — hide admin tab, go to catalog
+    document.getElementById('tab-admin').style.display = 'none';
+    showPage('catalog', document.getElementById('tab-catalog'));
+  }
+});
+
+// ─── FIRESTORE LISTENERS ─────────────────────────────────────────────────────
 onSnapshot(query(collection(db,'parts'), orderBy('created','asc')), snap => {
   parts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderParts();
-  if (adminLoggedIn) renderAdminParts();
+  if (currentUser) renderAdminParts();
 });
 
 onSnapshot(query(collection(db,'orders'), orderBy('created','desc')), snap => {
   orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderOrders();
-  if (adminLoggedIn) renderAdminOrders();
-});
-
-// Load admin password from Firestore only — never stored in JS source
-getDoc(doc(db,'settings','admin')).then(d => {
-  if (d.exists() && d.data().password) {
-    adminPassword = d.data().password;
-  } else {
-    // First time setup: write the default password to Firestore, then clear it from memory
-    setDoc(doc(db,'settings','admin'), { password: 'sigbots2025' }).then(() => {
-      adminPassword = 'sigbots2025';
-    });
-  }
+  if (currentUser) renderAdminOrders();
 });
 
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
@@ -412,9 +423,7 @@ window.showPage = function(name, btn) {
 window.renderParts = function() {
   const q    = (document.getElementById('search-input')?.value || '').toLowerCase();
   const grid = document.getElementById('parts-grid');
-  const list = parts.filter(p =>
-    p.name.toLowerCase().includes(q) || (p.tag||'').toLowerCase().includes(q)
-  );
+  const list = parts.filter(p => p.name.toLowerCase().includes(q) || (p.tag||'').toLowerCase().includes(q));
   if (!list.length) {
     grid.innerHTML = `<div class="empty-state"><div class="big">📦</div>
       <p>${parts.length ? 'No parts match your search.' : 'No parts yet.<br>Click <b>+ Add Part</b> to get started!'}</p></div>`;
@@ -422,14 +431,12 @@ window.renderParts = function() {
   }
   grid.innerHTML = list.map(p => `
     <div class="part-card">
-      <div class="part-img">
-        ${p.img ? `<img src="${p.img}" alt="${h(p.name)}" onerror="this.parentElement.innerHTML='📦'"/>` : '📦'}
-      </div>
+      <div class="part-img">${p.img ? `<img src="${p.img}" alt="${h(p.name)}" onerror="this.parentElement.innerHTML='📦'"/>` : '📦'}</div>
       <div class="part-body">
         <div class="part-name">${h(p.name)}</div>
         <div class="part-price">$${Number(p.price).toFixed(2)} / unit</div>
         ${p.tag ? `<span class="part-tag">${h(p.tag)}</span>` : ''}
-        ${p.url  ? `<a class="part-link" href="${h(p.url)}" target="_blank" rel="noopener">↗ View Product</a>` : ''}
+        ${p.url ? `<a class="part-link" href="${h(p.url)}" target="_blank" rel="noopener">↗ View Product</a>` : ''}
       </div>
       <div class="part-footer">
         <input class="qty-input" type="number" min="1" value="1" id="qty-${p.id}"/>
@@ -440,18 +447,15 @@ window.renderParts = function() {
 
 window.previewImage = function(e) {
   const file = e.target.files[0]; if (!file) return;
-  // Compress to max 800px wide to keep Firestore doc size reasonable
-  const img = new Image();
+  const img  = new Image();
   img.onload = () => {
-    const MAX = 800;
-    let w = img.width, wh = img.height;
+    const MAX = 800; let w = img.width, wh = img.height;
     if (w > MAX) { wh = Math.round(wh * MAX / w); w = MAX; }
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = wh;
     canvas.getContext('2d').drawImage(img, 0, 0, w, wh);
     pendingImgData = canvas.toDataURL('image/jpeg', 0.82);
-    const area = document.getElementById('img-upload-area');
-    area.classList.add('has-img');
+    document.getElementById('img-upload-area').classList.add('has-img');
     document.getElementById('img-preview-wrap').innerHTML =
       `<img src="${pendingImgData}" style="max-height:120px;border-radius:4px;object-fit:cover"/>
        <p style="margin-top:6px;font-size:11px">Click to change</p>`;
@@ -477,14 +481,11 @@ window.addPart = async function() {
   try {
     await addDoc(collection(db,'parts'), {
       name, price,
-      url:     document.getElementById('np-url').value.trim(),
-      tag:     document.getElementById('np-tag').value.trim(),
-      img:     pendingImgData || '',
-      created: Date.now()
+      url: document.getElementById('np-url').value.trim(),
+      tag: document.getElementById('np-tag').value.trim(),
+      img: pendingImgData || '', created: Date.now()
     });
-    closeModal('add-part-modal');
-    resetPartForm();
-    showToast('✅ Part added!');
+    closeModal('add-part-modal'); resetPartForm(); showToast('✅ Part added!');
   } catch(e) { alert('Error saving part: ' + e.message); }
   btn.textContent = 'Add Part'; btn.disabled = false;
 };
@@ -495,21 +496,17 @@ window.selectPay = function(type) {
   document.getElementById('pay-lead').classList.toggle('active', type==='lead');
   document.getElementById('pay-self').classList.toggle('active', type==='self');
 };
-
 window.addToCart = function(partId) {
   const qty = parseInt(document.getElementById('qty-'+partId)?.value) || 1;
   const ex  = cart.find(c => c.partId===partId);
   if (ex) ex.qty += qty; else cart.push({ partId, qty });
-  updateCartCount();
-  showToast('🛒 Added to cart!');
+  updateCartCount(); showToast('🛒 Added to cart!');
 };
-
 function updateCartCount() {
   document.getElementById('cart-count').textContent = cart.reduce((s,c)=>s+c.qty,0);
 }
-
-window.openCart = function() { renderCartItems(); document.getElementById('cart-overlay').classList.add('open'); document.getElementById('cart-drawer').classList.add('open'); };
-window.closeCart= function() { document.getElementById('cart-overlay').classList.remove('open'); document.getElementById('cart-drawer').classList.remove('open'); };
+window.openCart  = function() { renderCartItems(); document.getElementById('cart-overlay').classList.add('open'); document.getElementById('cart-drawer').classList.add('open'); };
+window.closeCart = function() { document.getElementById('cart-overlay').classList.remove('open'); document.getElementById('cart-drawer').classList.remove('open'); };
 
 function renderCartItems() {
   const list = document.getElementById('cart-items-list');
@@ -528,82 +525,65 @@ function renderCartItems() {
   }).join('');
   document.getElementById('cart-total').textContent = '$'+total.toFixed(2);
 }
-
 window.removeFromCart = function(idx) { cart.splice(idx,1); updateCartCount(); renderCartItems(); };
 
 window.submitOrder = async function() {
   const name = document.getElementById('requester-name').value.trim();
   if (!name)        { alert('Please enter your name before submitting.'); return; }
   if (!cart.length) { alert('Your cart is empty.'); return; }
-  const notes = document.getElementById('order-notes').value.trim();
   const items = cart.map(c => {
     const part = parts.find(p=>p.id===c.partId);
     return { partId:c.partId, partName:part?.name||'Unknown', price:part?.price||0, qty:c.qty };
   });
   try {
     await addDoc(collection(db,'orders'), {
-      name, notes, payType, items,
-      status:'pending', shippingStatus:'', adminNote:'',
-      created: Date.now()
+      name, notes: document.getElementById('order-notes').value.trim(),
+      payType, items, status:'pending', shippingStatus:'', adminNote:'', created: Date.now()
     });
-    cart=[];
-    document.getElementById('requester-name').value='';
-    document.getElementById('order-notes').value='';
-    payType='lead'; selectPay('lead');
-    updateCartCount(); closeCart();
+    cart=[]; document.getElementById('requester-name').value=''; document.getElementById('order-notes').value='';
+    payType='lead'; selectPay('lead'); updateCartCount(); closeCart();
     showToast('✅ Order submitted!');
     showPage('myorders', document.getElementById('tab-myorders'));
   } catch(e) { alert('Error submitting order: '+e.message); }
 };
 
-// ─── ORDERS ──────────────────────────────────────────────────────────────────
+// ─── ORDER RENDERING ─────────────────────────────────────────────────────────
 function statusClass(s) {
   if (s==='approved'||s==='modified-approved') return 'badge-approved';
-  if (s==='denied')  return 'badge-denied';
+  if (s==='denied') return 'badge-denied';
   if (s==='pending') return 'badge-pending';
   return 'badge-modified';
 }
 function statusLabel(s) {
   return s==='modified-approved' ? 'Modified & Approved' : s.charAt(0).toUpperCase()+s.slice(1);
 }
-
 window.renderOrders = function() {
   const list = document.getElementById('orders-list'); if (!list) return;
-  if (!orders.length) { list.innerHTML='<div class="empty-state"><div class="big">📋</div><p>No orders submitted yet.</p></div>'; return; }
-  list.innerHTML = orders.map(o=>orderHTML(o,false)).join('');
+  list.innerHTML = orders.length
+    ? orders.map(o=>orderHTML(o,false)).join('')
+    : '<div class="empty-state"><div class="big">📋</div><p>No orders submitted yet.</p></div>';
 };
-
 function orderHTML(o, isAdmin) {
-  const total    = o.items.reduce((s,i)=>s+i.price*i.qty,0);
-  const shipBadge= o.shippingStatus
-    ? `<span class="badge ${o.shippingStatus==='shipped'?'badge-shipped':'badge-ordered'}">${o.shippingStatus}</span>` : '';
-  const payBadge = o.payType==='self'
-    ? `<span class="badge badge-selfpay">🧾 Self Pay</span>`
-    : `<span class="badge badge-leadpay">💳 Lead Pays</span>`;
-
-  // Admin gets a full buy-list with links; users get a simple summary
+  const total     = o.items.reduce((s,i)=>s+i.price*i.qty,0);
+  const shipBadge = o.shippingStatus ? `<span class="badge ${o.shippingStatus==='shipped'?'badge-shipped':'badge-ordered'}">${o.shippingStatus}</span>` : '';
+  const payBadge  = o.payType==='self' ? `<span class="badge badge-selfpay">🧾 Self Pay</span>` : `<span class="badge badge-leadpay">💳 Lead Pays</span>`;
   const itemsHTML = isAdmin
     ? o.items.map((i,idx) => {
         const part = parts.find(p=>p.id===i.partId);
-        const url  = part?.url || i.url || '';
+        const url  = part?.url || '';
         return `<div class="buy-item">
           <div class="buy-item-num">${idx+1}</div>
           <div class="buy-item-info">
             <div class="buy-item-name">${h(i.partName)}</div>
-            ${url
-              ? `<a class="buy-item-link" href="${h(url)}" target="_blank" rel="noopener">🔗 ${h(url)}</a>`
-              : `<span class="buy-item-link no-link">No link on file</span>`}
+            ${url ? `<a class="buy-item-link" href="${h(url)}" target="_blank" rel="noopener">🔗 ${h(url)}</a>`
+                  : `<span class="buy-item-link no-link">No link on file</span>`}
             <div class="buy-item-price">$${i.price.toFixed(2)} / unit</div>
           </div>
-          <div class="buy-item-qty">
-            <div class="qty-num">${i.qty}</div>
-            <div class="qty-label">qty</div>
-          </div>
+          <div class="buy-item-qty"><div class="qty-num">${i.qty}</div><div class="qty-label">qty</div></div>
           <div class="buy-item-sub">$${(i.price*i.qty).toFixed(2)}</div>
         </div>`;
       }).join('')
     : o.items.map(i=>`<div class="order-item-row"><span>${h(i.partName)}</span><span>×${i.qty} = $${(i.price*i.qty).toFixed(2)}</span></div>`).join('');
-
   return `<div class="order-card">
     <div class="order-card-header">
       <span class="order-name">${h(o.name)}</span>
@@ -611,9 +591,7 @@ function orderHTML(o, isAdmin) {
       ${payBadge}${shipBadge}
       <span class="order-date">${new Date(o.created).toLocaleDateString()}</span>
     </div>
-    <div class="${isAdmin ? 'order-items' : 'order-items'}">
-      ${itemsHTML}
-    </div>
+    <div class="order-items">${itemsHTML}</div>
     ${o.notes     ? `<div class="order-notes">📝 ${h(o.notes)}</div>` : ''}
     ${o.adminNote ? `<div class="order-admin-note">💬 Admin: ${h(o.adminNote)}</div>` : ''}
     <div class="order-total-bar">Total: <span>$${total.toFixed(2)}</span></div>
@@ -627,7 +605,6 @@ function renderAdmin() {
   if (active==='orders') renderAdminOrders();
   if (active==='parts')  renderAdminParts();
 }
-
 window.showAdminTab = function(tab, btn) {
   document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
   if (btn) btn.classList.add('active');
@@ -637,12 +614,10 @@ window.showAdminTab = function(tab, btn) {
   if (tab==='orders') renderAdminOrders();
   if (tab==='parts')  renderAdminParts();
 };
-
 function renderAdminOrders() {
   const el = document.getElementById('admin-orders-tab');
   el.innerHTML = orders.length ? orders.map(o=>orderHTML(o,true)).join('') : '<div class="empty-state"><p>No orders yet.</p></div>';
 }
-
 function renderAdminParts() {
   const el = document.getElementById('admin-parts-tab');
   el.innerHTML = `<div style="margin-bottom:12px"><button class="btn" onclick="openModal('add-part-modal')">+ Add Part</button></div>` +
@@ -655,7 +630,6 @@ function renderAdminParts() {
       <button class="btn danger" style="font-size:12px;padding:6px 12px" onclick="deletePart('${p.id}')">Delete</button>
     </div>`).join('') : '<div class="empty-state"><p>No parts in catalog yet.</p></div>');
 }
-
 function adminActionsHTML(o) {
   return `<div class="admin-actions">
     ${(o.status==='pending'||o.status==='denied')?`<button class="btn" style="font-size:12px;padding:7px 12px" onclick="quickApprove('${o.id}')">✅ Approve</button>`:''}
@@ -669,28 +643,11 @@ function adminActionsHTML(o) {
     <button class="btn danger" style="font-size:12px;padding:7px 12px;margin-left:auto" onclick="deleteOrder('${o.id}')">🗑 Delete</button>
   </div>`;
 }
-
-window.quickApprove = async function(id) {
-  await updateDoc(doc(db,'orders',id), { status:'approved' });
-  showToast('✅ Order approved!');
-};
-window.denyOrder = async function(id) {
-  const note = prompt('Reason for denial (optional):') || '';
-  await updateDoc(doc(db,'orders',id), { status:'denied', ...(note && {adminNote:note}) });
-  showToast('Order denied.');
-};
-window.updateShipping = async function(id, val) {
-  await updateDoc(doc(db,'orders',id), { shippingStatus:val });
-};
-window.deleteOrder = async function(id) {
-  if (!confirm('Permanently delete this order?')) return;
-  await deleteDoc(doc(db,'orders',id));
-};
-window.deletePart = async function(id) {
-  if (!confirm('Delete this part from the catalog?')) return;
-  await deleteDoc(doc(db,'parts',id));
-  showToast('Part deleted.');
-};
+window.quickApprove   = async id => { await updateDoc(doc(db,'orders',id),{status:'approved'}); showToast('✅ Order approved!'); };
+window.denyOrder      = async id => { const note=prompt('Reason for denial (optional):')||''; await updateDoc(doc(db,'orders',id),{status:'denied',...(note&&{adminNote:note})}); showToast('Order denied.'); };
+window.updateShipping = async (id,val) => { await updateDoc(doc(db,'orders',id),{shippingStatus:val}); };
+window.deleteOrder    = async id => { if (!confirm('Permanently delete this order?')) return; await deleteDoc(doc(db,'orders',id)); };
+window.deletePart     = async id => { if (!confirm('Delete this part?')) return; await deleteDoc(doc(db,'parts',id)); showToast('Part deleted.'); };
 
 window.openModify = function(orderId) {
   modifyingOrderId = orderId;
@@ -707,65 +664,42 @@ window.openModify = function(orderId) {
   document.getElementById('modify-admin-note').value = o.adminNote||'';
   openModal('modify-modal');
 };
-
 window.saveModify = async function() {
   const o = orders.find(o=>o.id===modifyingOrderId); if (!o) return;
-  const newItems = o.items.map((item,idx)=>({
-    ...item, qty: parseInt(document.getElementById('mq-'+idx)?.value)||0
-  })).filter(i=>i.qty>0);
-  const note = document.getElementById('modify-admin-note').value.trim();
-  await updateDoc(doc(db,'orders',modifyingOrderId), {
-    items: newItems, adminNote: note, status:'modified-approved'
-  });
-  closeModal('modify-modal');
-  showToast('✅ Modified & approved!');
+  const newItems = o.items.map((item,idx)=>({...item,qty:parseInt(document.getElementById('mq-'+idx)?.value)||0})).filter(i=>i.qty>0);
+  await updateDoc(doc(db,'orders',modifyingOrderId),{items:newItems,adminNote:document.getElementById('modify-admin-note').value.trim(),status:'modified-approved'});
+  closeModal('modify-modal'); showToast('✅ Modified & approved!');
 };
 
-// ─── AUTH ────────────────────────────────────────────────────────────────────
+// ─── AUTH — Firebase handles everything, no passwords in JS ──────────────────
 window.adminLogin = async function() {
-  const pw = document.getElementById('admin-password').value;
-  if (!adminPassword) {
-    // Try fetching fresh from Firestore in case it wasn't loaded yet
-    const d = await getDoc(doc(db,'settings','admin'));
-    if (d.exists()) adminPassword = d.data().password;
+  const email = document.getElementById('admin-email').value.trim();
+  const pw    = document.getElementById('admin-password').value;
+  const btn   = document.getElementById('login-btn');
+  const err   = document.getElementById('login-error');
+  err.textContent = ''; btn.textContent = 'Signing in…'; btn.disabled = true;
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+    // onAuthStateChanged above handles the rest
+  } catch(e) {
+    err.textContent = 'Incorrect email or password.';
   }
-  if (pw === adminPassword) {
-    adminLoggedIn = true;
-    adminPassword = null; // wipe from memory after successful login
-    closeModal('admin-login-modal');
-    document.getElementById('admin-password').value='';
-    document.getElementById('tab-admin').style.display='';
-    showPage('admin', document.getElementById('tab-admin'));
-    showToast('👋 Welcome, Mechanics Lead!');
-  } else {
-    alert('Incorrect password.');
-    document.getElementById('admin-password').value='';
-  }
+  btn.textContent = 'Login'; btn.disabled = false;
 };
-window.adminLogout = function() {
-  adminLoggedIn = false;
-  document.getElementById('tab-admin').style.display='none';
-  showPage('catalog', document.getElementById('tab-catalog'));
-};
-window.changePassword = async function() {
-  const newPw = document.getElementById('new-pw-input').value.trim();
-  if (!newPw) { alert('Please enter a new password.'); return; }
-  await setDoc(doc(db,'settings','admin'), { password: newPw });
-  adminPassword = null; // wipe from memory immediately
-  document.getElementById('new-pw-input').value='';
-  showToast('🔑 Password updated!');
+window.adminLogout = async function() {
+  await signOut(auth);
+  // onAuthStateChanged above handles the rest
 };
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
-window.openModal  = function(id) { document.getElementById(id).classList.add('open'); };
-window.closeModal = function(id) { document.getElementById(id).classList.remove('open'); };
+window.openModal  = id => document.getElementById(id).classList.add('open');
+window.closeModal = id => document.getElementById(id).classList.remove('open');
 function h(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2600);
 }
-
 document.querySelectorAll('.modal-overlay').forEach(el =>
   el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); })
 );
